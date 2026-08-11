@@ -52,6 +52,10 @@ static void apply_demo_step(const demo_step_t *step) {
 }
 
 static void advance_demo_song_if_needed(void) {
+    if (g_samples_until_tick > 0) {
+        --g_samples_until_tick;
+    }
+
     if (g_samples_until_tick == 0) {
         g_samples_until_tick = AUDIO_SAMPLE_RATE_HZ / TEMPO_TICKS_PER_SECOND;
 
@@ -64,8 +68,6 @@ static void advance_demo_song_if_needed(void) {
             apply_demo_step(&k_demo_song[g_song_step_index]);
         }
     }
-
-    --g_samples_until_tick;
 }
 
 static bool audio_timer_callback(repeating_timer_t *timer) {
@@ -97,7 +99,7 @@ int main(void) {
     nes_apu_init(&g_apu, AUDIO_SAMPLE_RATE_HZ);
 
     g_song_step_index = 0;
-    g_samples_until_tick = 0;
+    g_samples_until_tick = AUDIO_SAMPLE_RATE_HZ / TEMPO_TICKS_PER_SECOND;
     apply_demo_step(&k_demo_song[0]);
 
     repeating_timer_t timer;

@@ -19,6 +19,14 @@ static float clampf(float value, float minimum, float maximum) {
     return value;
 }
 
+static float pulse_level(const nes_pulse_channel_t *channel) {
+    if (!channel->enabled || channel->volume <= 0.0f || channel->frequency_hz <= 0.0f) {
+        return 0.0f;
+    }
+
+    return 15.0f * channel->volume;
+}
+
 void nes_apu_init(nes_apu_t *apu, uint32_t sample_rate_hz) {
     *apu = (nes_apu_t){
         .sample_rate_hz = sample_rate_hz,
@@ -103,7 +111,7 @@ int16_t nes_apu_next_sample(nes_apu_t *apu) {
     const float noise = render_noise(&apu->noise, apu->sample_rate_hz);
 
     float pulse_mix = 0.0f;
-    const float pulse_sum = fabsf(pulse_0) + fabsf(pulse_1);
+    const float pulse_sum = pulse_level(&apu->pulse[0]) + pulse_level(&apu->pulse[1]);
     if (pulse_sum > 0.0f) {
         pulse_mix = 95.88f / ((8128.0f / pulse_sum) + 100.0f);
         pulse_mix *= (pulse_0 + pulse_1) / pulse_sum;
