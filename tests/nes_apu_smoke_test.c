@@ -15,12 +15,18 @@ int main(void) {
     int64_t sum = 0;
     int16_t previous = 0;
     int transitions = 0;
+    int16_t minimum = 32767;
+    int16_t maximum = -32768;
 
     for (int i = 0; i < 4096; ++i) {
         const int16_t sample = nes_apu_next_sample(&apu);
-        assert(sample >= -32767);
-        assert(sample <= 32767);
         sum += llabs((long long)sample);
+        if (sample < minimum) {
+            minimum = sample;
+        }
+        if (sample > maximum) {
+            maximum = sample;
+        }
         if (i > 0 && sample != previous) {
             ++transitions;
         }
@@ -29,5 +35,7 @@ int main(void) {
 
     assert(sum > 1000000);
     assert(transitions > 100);
+    assert(minimum < 0);
+    assert(maximum > 0);
     return 0;
 }
