@@ -171,7 +171,7 @@ int16_t nes_apu_next_sample(nes_apu_t *apu) {
     }
 
     float tnd_mix = 0.0f;
-    const float tnd_sum = (3.0f * triangle / 8227.0f) + (2.0f * noise / 12241.0f);
+    const float tnd_sum = (triangle / 8227.0f) + (noise / 12241.0f);
     if (tnd_sum > 0.0f) {
         tnd_mix = 159.79f / ((1.0f / tnd_sum) + 100.0f);
     }
