@@ -2,11 +2,26 @@
 
 #include <math.h>
 
-static const float k_noise_period_hz[] = {
-    440.0f, 660.0f, 880.0f, 1100.0f,
-    1320.0f, 1760.0f, 2200.0f, 2640.0f,
-    3520.0f, 4400.0f, 5280.0f, 7040.0f,
-    8800.0f, 10560.0f, 14080.0f, 17600.0f,
+#define NES_APU_CPU_CLOCK_HZ 1789773.0f
+#define NES_APU_DC_BLOCK_COEFFICIENT 0.995f
+
+static const uint8_t k_pulse_duty_sequences[4][8] = {
+    {0u, 1u, 0u, 0u, 0u, 0u, 0u, 0u},
+    {0u, 1u, 1u, 0u, 0u, 0u, 0u, 0u},
+    {0u, 1u, 1u, 1u, 1u, 0u, 0u, 0u},
+    {1u, 0u, 0u, 1u, 1u, 1u, 1u, 1u},
+};
+
+static const uint8_t k_triangle_sequence[32] = {
+    15u, 14u, 13u, 12u, 11u, 10u, 9u, 8u,
+    7u, 6u, 5u, 4u, 3u, 2u, 1u, 0u,
+    0u, 1u, 2u, 3u, 4u, 5u, 6u, 7u,
+    8u, 9u, 10u, 11u, 12u, 13u, 14u, 15u,
+};
+
+static const uint16_t k_noise_period_cycles[16] = {
+    4u, 8u, 16u, 32u, 64u, 96u, 128u, 160u,
+    202u, 254u, 380u, 508u, 762u, 1016u, 2034u, 4068u,
 };
 
 static float clampf(float value, float minimum, float maximum) {
@@ -19,12 +34,34 @@ static float clampf(float value, float minimum, float maximum) {
     return value;
 }
 
-static float pulse_level(const nes_pulse_channel_t *channel) {
-    if (!channel->enabled || channel->volume <= 0.0f || channel->frequency_hz <= 0.0f) {
-        return 0.0f;
+static uint8_t quantize_volume(float volume) {
+    return (uint8_t)lrintf(clampf(volume, 0.0f, 1.0f) * 15.0f);
+}
+
+static uint8_t quantize_duty_mode(float duty_cycle) {
+    static const float duty_modes[4] = {0.125f, 0.25f, 0.50f, 0.75f};
+    uint8_t best_mode = 0u;
+    float best_distance = fabsf(duty_cycle - duty_modes[0]);
+
+    for (uint8_t i = 1u; i < 4u; ++i) {
+        const float distance = fabsf(duty_cycle - duty_modes[i]);
+        if (distance < best_distance) {
+            best_distance = distance;
+            best_mode = i;
+        }
     }
 
-    return 15.0f * channel->volume;
+    return best_mode;
+}
+
+static uint16_t quantize_timer_period(float divisor, float frequency_hz) {
+    if (frequency_hz <= 0.0f) {
+        return 0u;
+    }
+
+    float timer = (NES_APU_CPU_CLOCK_HZ / (divisor * frequency_hz)) - 1.0f;
+    timer = roundf(clampf(timer, 0.0f, 2047.0f));
+    return (uint16_t)timer;
 }
 
 void nes_apu_init(nes_apu_t *apu, uint32_t sample_rate_hz) {
@@ -41,16 +78,20 @@ void nes_apu_set_pulse(nes_apu_t *apu, size_t channel, bool enabled, float frequ
         return;
     }
 
-    apu->pulse[channel].enabled = enabled;
-    apu->pulse[channel].frequency_hz = frequency_hz;
-    apu->pulse[channel].volume = clampf(volume, 0.0f, 1.0f);
-    apu->pulse[channel].duty_cycle = clampf(duty_cycle, 0.05f, 0.95f);
+    nes_pulse_channel_t *pulse = &apu->pulse[channel];
+    pulse->enabled = enabled;
+    pulse->frequency_hz = frequency_hz;
+    pulse->volume = clampf(volume, 0.0f, 1.0f);
+    pulse->duty_cycle = duty_cycle;
+    pulse->timer_period = quantize_timer_period(16.0f, frequency_hz);
+    pulse->duty_mode = quantize_duty_mode(duty_cycle);
 }
 
 void nes_apu_set_triangle(nes_apu_t *apu, bool enabled, float frequency_hz, float volume) {
     apu->triangle.enabled = enabled;
     apu->triangle.frequency_hz = frequency_hz;
     apu->triangle.volume = clampf(volume, 0.0f, 1.0f);
+    apu->triangle.timer_period = quantize_timer_period(32.0f, frequency_hz);
 }
 
 void nes_apu_set_noise(nes_apu_t *apu, bool enabled, uint8_t period_index, float volume) {
@@ -59,16 +100,25 @@ void nes_apu_set_noise(nes_apu_t *apu, bool enabled, uint8_t period_index, float
     apu->noise.volume = clampf(volume, 0.0f, 1.0f);
 }
 
+void nes_apu_set_noise_mode(nes_apu_t *apu, bool short_mode) {
+    apu->noise.short_mode = short_mode;
+}
+
 static float render_pulse(nes_pulse_channel_t *channel, uint32_t sample_rate_hz) {
-    if (!channel->enabled || channel->volume <= 0.0f || channel->frequency_hz <= 0.0f) {
+    if (!channel->enabled || channel->volume <= 0.0f || channel->frequency_hz <= 0.0f || channel->timer_period < 8u) {
         return 0.0f;
     }
 
-    channel->phase += channel->frequency_hz / (float)sample_rate_hz;
-    channel->phase -= floorf(channel->phase);
+    const float timer_cycles = 16.0f * (float)(channel->timer_period + 1u);
+    channel->timer_phase_cycles += NES_APU_CPU_CLOCK_HZ / (float)sample_rate_hz;
 
-    const float step = (channel->phase < channel->duty_cycle) ? 1.0f : -1.0f;
-    return 15.0f * channel->volume * step;
+    while (channel->timer_phase_cycles >= timer_cycles) {
+        channel->timer_phase_cycles -= timer_cycles;
+        channel->sequence_index = (uint8_t)((channel->sequence_index + 1u) & 0x07u);
+    }
+
+    const uint8_t level = k_pulse_duty_sequences[channel->duty_mode][channel->sequence_index];
+    return (float)level * (float)quantize_volume(channel->volume);
 }
 
 static float render_triangle(nes_triangle_channel_t *channel, uint32_t sample_rate_hz) {
@@ -76,11 +126,15 @@ static float render_triangle(nes_triangle_channel_t *channel, uint32_t sample_ra
         return 0.0f;
     }
 
-    channel->phase += channel->frequency_hz / (float)sample_rate_hz;
-    channel->phase -= floorf(channel->phase);
+    const float timer_cycles = 32.0f * (float)(channel->timer_period + 1u);
+    channel->timer_phase_cycles += NES_APU_CPU_CLOCK_HZ / (float)sample_rate_hz;
 
-    const float triangle = 1.0f - 4.0f * fabsf(channel->phase - 0.5f);
-    return 15.0f * channel->volume * triangle;
+    while (channel->timer_phase_cycles >= timer_cycles) {
+        channel->timer_phase_cycles -= timer_cycles;
+        channel->sequence_index = (uint8_t)((channel->sequence_index + 1u) & 0x1fu);
+    }
+
+    return (float)k_triangle_sequence[channel->sequence_index] * clampf(channel->volume, 0.0f, 1.0f);
 }
 
 static float render_noise(nes_noise_channel_t *channel, uint32_t sample_rate_hz) {
@@ -88,20 +142,20 @@ static float render_noise(nes_noise_channel_t *channel, uint32_t sample_rate_hz)
         return 0.0f;
     }
 
-    const float noise_hz = k_noise_period_hz[channel->period_index];
-    channel->phase += noise_hz / (float)sample_rate_hz;
+    const float timer_cycles = (float)k_noise_period_cycles[channel->period_index];
+    channel->timer_phase_cycles += NES_APU_CPU_CLOCK_HZ / (float)sample_rate_hz;
 
-    while (channel->phase >= 1.0f) {
-        channel->phase -= 1.0f;
-        const uint16_t feedback = (channel->lfsr ^ (channel->lfsr >> 1u)) & 1u;
+    while (channel->timer_phase_cycles >= timer_cycles) {
+        channel->timer_phase_cycles -= timer_cycles;
+        const uint16_t tap = channel->short_mode ? 6u : 1u;
+        const uint16_t feedback = ((channel->lfsr & 1u) ^ ((channel->lfsr >> tap) & 1u)) & 1u;
         channel->lfsr = (channel->lfsr >> 1u) | (feedback << 14u);
         if (channel->lfsr == 0u) {
             channel->lfsr = 1u;
         }
     }
 
-    const float sample = (channel->lfsr & 1u) ? 1.0f : -1.0f;
-    return 15.0f * channel->volume * sample;
+    return ((channel->lfsr & 1u) == 0u) ? (float)quantize_volume(channel->volume) : 0.0f;
 }
 
 int16_t nes_apu_next_sample(nes_apu_t *apu) {
@@ -111,23 +165,21 @@ int16_t nes_apu_next_sample(nes_apu_t *apu) {
     const float noise = render_noise(&apu->noise, apu->sample_rate_hz);
 
     float pulse_mix = 0.0f;
-    const float pulse_sum = pulse_level(&apu->pulse[0]) + pulse_level(&apu->pulse[1]);
+    const float pulse_sum = pulse_0 + pulse_1;
     if (pulse_sum > 0.0f) {
         pulse_mix = 95.88f / ((8128.0f / pulse_sum) + 100.0f);
-        pulse_mix *= (pulse_0 + pulse_1) / pulse_sum;
     }
 
     float tnd_mix = 0.0f;
-    const float tnd_sum = (fabsf(triangle) / 8227.0f) + (fabsf(noise) / 12241.0f);
+    const float tnd_sum = (3.0f * triangle / 8227.0f) + (2.0f * noise / 12241.0f);
     if (tnd_sum > 0.0f) {
         tnd_mix = 159.79f / ((1.0f / tnd_sum) + 100.0f);
-        const float signed_mix = triangle + noise;
-        const float magnitude = fabsf(triangle) + fabsf(noise);
-        if (magnitude > 0.0f) {
-            tnd_mix *= signed_mix / magnitude;
-        }
     }
 
-    const float mixed = clampf((pulse_mix + tnd_mix) * 1.8f, -1.0f, 1.0f);
-    return (int16_t)lrintf(mixed * 32767.0f);
+    const float mixed = pulse_mix + tnd_mix;
+    const float filtered = mixed - apu->dc_prev_input + (NES_APU_DC_BLOCK_COEFFICIENT * apu->dc_prev_output);
+    apu->dc_prev_input = mixed;
+    apu->dc_prev_output = filtered;
+
+    return (int16_t)lrintf(clampf(filtered * 1.5f, -1.0f, 1.0f) * 32767.0f);
 }

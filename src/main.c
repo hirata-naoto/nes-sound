@@ -23,19 +23,20 @@ typedef struct {
     float pulse0_duty;
     float pulse1_duty;
     bool noise_enabled;
+    bool noise_short_mode;
     uint8_t noise_period_index;
     float noise_volume;
 } demo_step_t;
 
 static const demo_step_t k_demo_song[] = {
-    {12, 523.25f, 783.99f, 130.81f, 0.55f, 0.35f, 0.35f, 0.125f, 0.25f, true, 5, 0.20f},
-    {12, 659.25f, 987.77f, 164.81f, 0.55f, 0.35f, 0.35f, 0.125f, 0.25f, false, 0, 0.00f},
-    {12, 783.99f, 1174.66f, 196.00f, 0.55f, 0.35f, 0.35f, 0.250f, 0.50f, true, 4, 0.20f},
-    {12, 659.25f, 987.77f, 164.81f, 0.55f, 0.35f, 0.35f, 0.125f, 0.25f, false, 0, 0.00f},
-    {12, 587.33f, 880.00f, 146.83f, 0.55f, 0.35f, 0.35f, 0.125f, 0.25f, true, 6, 0.18f},
-    {12, 659.25f, 987.77f, 164.81f, 0.55f, 0.35f, 0.35f, 0.250f, 0.50f, false, 0, 0.00f},
-    {12, 698.46f, 1046.50f, 174.61f, 0.55f, 0.35f, 0.35f, 0.125f, 0.25f, true, 5, 0.20f},
-    {24, 783.99f, 1174.66f, 196.00f, 0.60f, 0.40f, 0.40f, 0.250f, 0.50f, true, 3, 0.16f},
+    {12, 523.25f, 783.99f, 130.81f, 0.55f, 0.35f, 0.35f, 0.125f, 0.25f, true, false, 5, 0.20f},
+    {12, 659.25f, 987.77f, 164.81f, 0.55f, 0.35f, 0.35f, 0.125f, 0.25f, false, false, 0, 0.00f},
+    {12, 783.99f, 1174.66f, 196.00f, 0.55f, 0.35f, 0.35f, 0.250f, 0.50f, true, true, 4, 0.20f},
+    {12, 659.25f, 987.77f, 164.81f, 0.55f, 0.35f, 0.35f, 0.125f, 0.25f, false, false, 0, 0.00f},
+    {12, 587.33f, 880.00f, 146.83f, 0.55f, 0.35f, 0.35f, 0.125f, 0.25f, true, false, 6, 0.18f},
+    {12, 659.25f, 987.77f, 164.81f, 0.55f, 0.35f, 0.35f, 0.250f, 0.50f, false, false, 0, 0.00f},
+    {12, 698.46f, 1046.50f, 174.61f, 0.55f, 0.35f, 0.35f, 0.125f, 0.25f, true, true, 5, 0.20f},
+    {24, 783.99f, 1174.66f, 196.00f, 0.60f, 0.40f, 0.40f, 0.250f, 0.50f, true, false, 3, 0.16f},
 };
 
 static nes_apu_t g_apu;
@@ -48,6 +49,7 @@ static void apply_demo_step(const demo_step_t *step) {
     nes_apu_set_pulse(&g_apu, 1, true, step->pulse1_hz, step->pulse1_volume, step->pulse1_duty);
     nes_apu_set_triangle(&g_apu, true, step->triangle_hz, step->triangle_volume);
     nes_apu_set_noise(&g_apu, step->noise_enabled, step->noise_period_index, step->noise_volume);
+    nes_apu_set_noise_mode(&g_apu, step->noise_short_mode);
     g_ticks_until_step_change = step->duration_ticks;
 }
 

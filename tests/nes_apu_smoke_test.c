@@ -1,10 +1,11 @@
 #include <assert.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
 
 #include "nes_apu.h"
 
-int main(void) {
+static void assert_mixed_output_is_active(void) {
     nes_apu_t apu;
     nes_apu_init(&apu, 22050);
     nes_apu_set_pulse(&apu, 0, true, 440.0f, 0.7f, 0.125f);
@@ -37,5 +38,40 @@ int main(void) {
     assert(transitions > 100);
     assert(minimum < 0);
     assert(maximum > 0);
+}
+
+static int64_t capture_noise_signature(bool short_mode) {
+    nes_apu_t apu;
+    nes_apu_init(&apu, 22050);
+    nes_apu_set_noise(&apu, true, 4u, 0.8f);
+    nes_apu_set_noise_mode(&apu, short_mode);
+
+    int64_t signature = 0;
+    for (int i = 0; i < 1024; ++i) {
+        signature += (int64_t)(i + 1) * (int64_t)nes_apu_next_sample(&apu);
+    }
+    return signature;
+}
+
+static void assert_noise_modes_diverge(void) {
+    const int64_t long_noise = capture_noise_signature(false);
+    const int64_t short_noise = capture_noise_signature(true);
+
+    assert(long_noise != short_noise);
+}
+
+static void assert_disabled_channels_are_silent(void) {
+    nes_apu_t apu;
+    nes_apu_init(&apu, 22050);
+
+    for (int i = 0; i < 128; ++i) {
+        assert(nes_apu_next_sample(&apu) == 0);
+    }
+}
+
+int main(void) {
+    assert_disabled_channels_are_silent();
+    assert_mixed_output_is_active();
+    assert_noise_modes_diverge();
     return 0;
 }
