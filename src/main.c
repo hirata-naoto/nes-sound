@@ -7,7 +7,7 @@
 
 #include "nes_apu.h"
 
-#define AUDIO_PWM_GPIO 18
+#define AUDIO_PWM_GPIO 1
 #define AUDIO_PWM_WRAP 255
 #define AUDIO_SAMPLE_RATE_HZ 22050
 #define TEMPO_TICKS_PER_SECOND 60
