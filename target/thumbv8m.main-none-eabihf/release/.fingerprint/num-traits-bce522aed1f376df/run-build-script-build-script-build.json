@@ -1,0 +1,1 @@
+{"rustc":1625334936438085654,"features":"","declared_features":"","target":0,"profile":0,"path":0,"deps":[[5157631553186200874,"build_script_build",false,10992291323879859739]],"local":[{"RerunIfChanged":{"output":"thumbv8m.main-none-eabihf/release/build/num-traits-bce522aed1f376df/output","paths":["build.rs"]}}],"rustflags":["-C","link-arg=--nmagic"],"config":0,"compile_kind":0}

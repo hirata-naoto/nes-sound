@@ -6,7 +6,7 @@ RP2350（Raspberry Pi Pico 2）で動作する、Embassy-rs ベースの NES APU
 
 - `src/apu.rs` - ホストでもテストできる APU チャンネル、ミキサ、DPCM デコーダ
 - `src/main.rs` - Embassy の非同期タイマーと PWM を使った Pico 2 ファームウェア、デモ曲
-- `tests` - APU のホストテスト
+- `src/apu.rs` - APU のホストテスト
 
 ## 配線
 
@@ -26,7 +26,7 @@ cargo build --release --features firmware
 elf2uf2-rs target/thumbv8m.main-none-eabihf/release/nes-sound nes-sound.uf2
 ```
 
-Pico 2 を BOOTSEL モードで接続し、生成された `nes-sound.uf2` をドライブへコピーします。GPIO1 の PWM キャリアを 22.05 kHz のサンプル更新で変調し、起動後すぐに DPCM を含むデモループを再生します。
+Pico 2 を BOOTSEL モードで接続し、生成された `nes-sound.uf2` をドライブへコピーします。GPIO1 の PWM キャリアを平均 22.05 kHz のサンプル更新で変調し、起動後すぐに DPCM を含むデモループを再生します。
 
 ## ホストテスト
 

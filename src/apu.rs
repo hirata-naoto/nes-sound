@@ -8,8 +8,8 @@ const PULSE_DUTY_SEQUENCES: [[u8; 8]; 4] = [
     [1, 0, 0, 1, 1, 1, 1, 1],
 ];
 const TRIANGLE_SEQUENCE: [u8; 32] = [
-    15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
-    12, 13, 14, 15,
+    15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
+    13, 14, 15,
 ];
 const NOISE_PERIOD_CYCLES: [u16; 16] = [
     4, 8, 16, 32, 64, 96, 128, 160, 202, 254, 380, 508, 762, 1016, 2034, 4068,
@@ -71,6 +71,7 @@ struct DpcmChannel {
     shift_register: u8,
     bits_remaining: u8,
     output_level: u8,
+    output_active: bool,
     timer_phase_cycles: f32,
 }
 
@@ -85,6 +86,7 @@ impl Default for DpcmChannel {
             shift_register: 0,
             bits_remaining: 0,
             output_level: 64,
+            output_active: false,
             timer_phase_cycles: 0.0,
         }
     }
@@ -192,6 +194,7 @@ impl Apu {
         self.dpcm.shift_register = 0;
         self.dpcm.bits_remaining = 0;
         self.dpcm.output_level = 64;
+        self.dpcm.output_active = true;
         self.dpcm.timer_phase_cycles = 0.0;
     }
 
@@ -322,7 +325,11 @@ fn render_dpcm(channel: &mut DpcmChannel, sample_rate_hz: u32) -> f32 {
         }
     }
 
-    channel.output_level as f32
+    if channel.output_active {
+        channel.output_level as f32
+    } else {
+        0.0
+    }
 }
 
 fn clock_dpcm_bit(channel: &mut DpcmChannel) {

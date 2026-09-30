@@ -6,7 +6,7 @@ use embassy_executor::Spawner;
 #[cfg(target_arch = "arm")]
 use embassy_rp::pwm::{Config, Pwm, SetDutyCycle};
 #[cfg(target_arch = "arm")]
-use embassy_time::{Duration, Ticker};
+use embassy_time::{Duration, Instant, Timer};
 #[cfg(target_arch = "arm")]
 use nes_sound::apu::Apu;
 #[cfg(target_arch = "arm")]
@@ -35,29 +35,132 @@ struct SongStep {
 
 #[cfg(target_arch = "arm")]
 const DEMO_SONG: [SongStep; 8] = [
-    SongStep { duration_ticks: 12, pulse_hz: [523.25, 783.99], triangle_hz: 130.81, pulse_volume: [0.55, 0.35], triangle_volume: 0.35, pulse_duty: [0.125, 0.25], noise_enabled: true, noise_short_mode: false, noise_period_index: 5, noise_volume: 0.20 },
-    SongStep { duration_ticks: 12, pulse_hz: [659.25, 987.77], triangle_hz: 164.81, pulse_volume: [0.55, 0.35], triangle_volume: 0.35, pulse_duty: [0.125, 0.25], noise_enabled: false, noise_short_mode: false, noise_period_index: 0, noise_volume: 0.00 },
-    SongStep { duration_ticks: 12, pulse_hz: [783.99, 1174.66], triangle_hz: 196.00, pulse_volume: [0.55, 0.35], triangle_volume: 0.35, pulse_duty: [0.250, 0.50], noise_enabled: true, noise_short_mode: true, noise_period_index: 4, noise_volume: 0.20 },
-    SongStep { duration_ticks: 12, pulse_hz: [659.25, 987.77], triangle_hz: 164.81, pulse_volume: [0.55, 0.35], triangle_volume: 0.35, pulse_duty: [0.125, 0.25], noise_enabled: false, noise_short_mode: false, noise_period_index: 0, noise_volume: 0.00 },
-    SongStep { duration_ticks: 12, pulse_hz: [587.33, 880.00], triangle_hz: 146.83, pulse_volume: [0.55, 0.35], triangle_volume: 0.35, pulse_duty: [0.125, 0.25], noise_enabled: true, noise_short_mode: false, noise_period_index: 6, noise_volume: 0.18 },
-    SongStep { duration_ticks: 12, pulse_hz: [659.25, 987.77], triangle_hz: 164.81, pulse_volume: [0.55, 0.35], triangle_volume: 0.35, pulse_duty: [0.250, 0.50], noise_enabled: false, noise_short_mode: false, noise_period_index: 0, noise_volume: 0.00 },
-    SongStep { duration_ticks: 12, pulse_hz: [698.46, 1046.50], triangle_hz: 174.61, pulse_volume: [0.55, 0.35], triangle_volume: 0.35, pulse_duty: [0.125, 0.25], noise_enabled: true, noise_short_mode: true, noise_period_index: 5, noise_volume: 0.20 },
-    SongStep { duration_ticks: 24, pulse_hz: [783.99, 1174.66], triangle_hz: 196.00, pulse_volume: [0.60, 0.40], triangle_volume: 0.40, pulse_duty: [0.250, 0.50], noise_enabled: true, noise_short_mode: false, noise_period_index: 3, noise_volume: 0.16 },
+    SongStep {
+        duration_ticks: 12,
+        pulse_hz: [523.25, 783.99],
+        triangle_hz: 130.81,
+        pulse_volume: [0.55, 0.35],
+        triangle_volume: 0.35,
+        pulse_duty: [0.125, 0.25],
+        noise_enabled: true,
+        noise_short_mode: false,
+        noise_period_index: 5,
+        noise_volume: 0.20,
+    },
+    SongStep {
+        duration_ticks: 12,
+        pulse_hz: [659.25, 987.77],
+        triangle_hz: 164.81,
+        pulse_volume: [0.55, 0.35],
+        triangle_volume: 0.35,
+        pulse_duty: [0.125, 0.25],
+        noise_enabled: false,
+        noise_short_mode: false,
+        noise_period_index: 0,
+        noise_volume: 0.00,
+    },
+    SongStep {
+        duration_ticks: 12,
+        pulse_hz: [783.99, 1174.66],
+        triangle_hz: 196.00,
+        pulse_volume: [0.55, 0.35],
+        triangle_volume: 0.35,
+        pulse_duty: [0.250, 0.50],
+        noise_enabled: true,
+        noise_short_mode: true,
+        noise_period_index: 4,
+        noise_volume: 0.20,
+    },
+    SongStep {
+        duration_ticks: 12,
+        pulse_hz: [659.25, 987.77],
+        triangle_hz: 164.81,
+        pulse_volume: [0.55, 0.35],
+        triangle_volume: 0.35,
+        pulse_duty: [0.125, 0.25],
+        noise_enabled: false,
+        noise_short_mode: false,
+        noise_period_index: 0,
+        noise_volume: 0.00,
+    },
+    SongStep {
+        duration_ticks: 12,
+        pulse_hz: [587.33, 880.00],
+        triangle_hz: 146.83,
+        pulse_volume: [0.55, 0.35],
+        triangle_volume: 0.35,
+        pulse_duty: [0.125, 0.25],
+        noise_enabled: true,
+        noise_short_mode: false,
+        noise_period_index: 6,
+        noise_volume: 0.18,
+    },
+    SongStep {
+        duration_ticks: 12,
+        pulse_hz: [659.25, 987.77],
+        triangle_hz: 164.81,
+        pulse_volume: [0.55, 0.35],
+        triangle_volume: 0.35,
+        pulse_duty: [0.250, 0.50],
+        noise_enabled: false,
+        noise_short_mode: false,
+        noise_period_index: 0,
+        noise_volume: 0.00,
+    },
+    SongStep {
+        duration_ticks: 12,
+        pulse_hz: [698.46, 1046.50],
+        triangle_hz: 174.61,
+        pulse_volume: [0.55, 0.35],
+        triangle_volume: 0.35,
+        pulse_duty: [0.125, 0.25],
+        noise_enabled: true,
+        noise_short_mode: true,
+        noise_period_index: 5,
+        noise_volume: 0.20,
+    },
+    SongStep {
+        duration_ticks: 24,
+        pulse_hz: [783.99, 1174.66],
+        triangle_hz: 196.00,
+        pulse_volume: [0.60, 0.40],
+        triangle_volume: 0.40,
+        pulse_duty: [0.250, 0.50],
+        noise_enabled: true,
+        noise_short_mode: false,
+        noise_period_index: 3,
+        noise_volume: 0.16,
+    },
 ];
 
 #[cfg(target_arch = "arm")]
 static DPCM_DEMO_SAMPLE: [u8; 32] = [
-    0x11, 0x33, 0x55, 0x77, 0x7f, 0x6f, 0x5f, 0x4f, 0x3f, 0x2f, 0x1f, 0x0f, 0x00, 0x24, 0x48,
-    0x6c, 0x7e, 0x5a, 0x36, 0x12, 0x03, 0x27, 0x4b, 0x6f, 0x7f, 0x5f, 0x3f, 0x1f, 0x08, 0x2a,
-    0x4c, 0x6e,
+    0x11, 0x33, 0x55, 0x77, 0x7f, 0x6f, 0x5f, 0x4f, 0x3f, 0x2f, 0x1f, 0x0f, 0x00, 0x24, 0x48, 0x6c,
+    0x7e, 0x5a, 0x36, 0x12, 0x03, 0x27, 0x4b, 0x6f, 0x7f, 0x5f, 0x3f, 0x1f, 0x08, 0x2a, 0x4c, 0x6e,
 ];
 
 #[cfg(target_arch = "arm")]
 fn apply_song_step(apu: &mut Apu, step: &SongStep) {
-    apu.set_pulse(0, true, step.pulse_hz[0], step.pulse_volume[0], step.pulse_duty[0]);
-    apu.set_pulse(1, true, step.pulse_hz[1], step.pulse_volume[1], step.pulse_duty[1]);
+    apu.set_pulse(
+        0,
+        true,
+        step.pulse_hz[0],
+        step.pulse_volume[0],
+        step.pulse_duty[0],
+    );
+    apu.set_pulse(
+        1,
+        true,
+        step.pulse_hz[1],
+        step.pulse_volume[1],
+        step.pulse_duty[1],
+    );
     apu.set_triangle(true, step.triangle_hz, step.triangle_volume);
-    apu.set_noise(step.noise_enabled, step.noise_period_index, step.noise_volume);
+    apu.set_noise(
+        step.noise_enabled,
+        step.noise_period_index,
+        step.noise_volume,
+    );
     apu.set_noise_mode(step.noise_short_mode);
 }
 
@@ -82,7 +185,8 @@ async fn main(_spawner: Spawner) {
     let mut samples_until_tick = AUDIO_SAMPLE_RATE_HZ / TEMPO_TICKS_PER_SECOND;
     apply_song_step(&mut apu, &DEMO_SONG[step_index]);
 
-    let mut ticker = Ticker::every(Duration::from_micros(45));
+    let mut next_sample_at = Instant::now();
+    let mut sample_period_remainder = 0;
     loop {
         samples_until_tick -= 1;
         if samples_until_tick == 0 {
@@ -98,7 +202,15 @@ async fn main(_spawner: Spawner) {
         let sample = apu.next_sample();
         let pwm_level = ((sample as i32 + 32768) >> 8) as u16;
         let _ = pwm.set_duty_cycle(pwm_level);
-        ticker.next().await;
+
+        let mut sample_period_us = 45;
+        sample_period_remainder += 7_750;
+        if sample_period_remainder >= AUDIO_SAMPLE_RATE_HZ {
+            sample_period_remainder -= AUDIO_SAMPLE_RATE_HZ;
+            sample_period_us += 1;
+        }
+        next_sample_at += Duration::from_micros(sample_period_us);
+        Timer::at(next_sample_at).await;
     }
 }
 
