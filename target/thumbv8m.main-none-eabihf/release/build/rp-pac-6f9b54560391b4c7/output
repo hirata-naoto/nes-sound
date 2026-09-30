@@ -1,3 +1,0 @@
-cargo:rustc-link-search=/home/runner/work/nes-sound/nes-sound/target/thumbv8m.main-none-eabihf/release/build/rp-pac-6f9b54560391b4c7/out
-cargo:rerun-if-changed=device.x
-cargo:rerun-if-changed=build.rs

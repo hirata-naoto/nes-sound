@@ -6,7 +6,6 @@ RP2350（Raspberry Pi Pico 2）で動作する、Embassy-rs ベースの NES APU
 
 - `src/apu.rs` - ホストでもテストできる APU チャンネル、ミキサ、DPCM デコーダ
 - `src/main.rs` - Embassy の非同期タイマーと PWM を使った Pico 2 ファームウェア、デモ曲
-- `src/apu.rs` - APU のホストテスト
 
 ## 配線
 
