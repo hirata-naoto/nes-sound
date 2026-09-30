@@ -228,7 +228,7 @@ impl Apu {
         self.dc_prev_input = mixed;
         self.dc_prev_output = filtered;
 
-        (filtered.clamp(-1.0, 1.0) * 1.5 * 32767.0).round() as i16
+        round_to_i32(filtered.clamp(-1.0, 1.0) * 1.5 * 32767.0) as i16
     }
 }
 
@@ -237,11 +237,19 @@ fn timer_period(divisor: f32, frequency_hz: f32) -> u16 {
         return 0;
     }
 
-    ((NES_CPU_CLOCK_HZ / (divisor * frequency_hz) - 1.0).clamp(0.0, 2047.0)).round() as u16
+    ((NES_CPU_CLOCK_HZ / (divisor * frequency_hz) - 1.0).clamp(0.0, 2047.0) + 0.5) as u16
 }
 
 fn quantize_volume(volume: f32) -> u8 {
-    (volume.clamp(0.0, 1.0) * 15.0).round() as u8
+    (volume.clamp(0.0, 1.0) * 15.0 + 0.5) as u8
+}
+
+fn round_to_i32(value: f32) -> i32 {
+    if value >= 0.0 {
+        (value + 0.5) as i32
+    } else {
+        (value - 0.5) as i32
+    }
 }
 
 fn render_pulse(channel: &mut PulseChannel, sample_rate_hz: u32) -> f32 {
