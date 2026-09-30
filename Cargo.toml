@@ -1,0 +1,37 @@
+[package]
+name = "nes-sound"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+default = []
+firmware = [
+    "dep:cortex-m-rt",
+    "dep:embassy-executor",
+    "dep:embassy-rp",
+    "dep:embassy-time",
+    "dep:panic-halt",
+]
+
+[dependencies]
+cortex-m-rt = { version = "0.7.7", optional = true }
+embassy-executor = { version = "0.10.0", features = ["executor-thread", "platform-cortex-m"], optional = true }
+embassy-rp = { version = "0.10.0", features = ["critical-section-impl", "executor-thread", "rp235xa", "time-driver"], optional = true }
+embassy-time = { version = "0.5.1", optional = true }
+panic-halt = { version = "1.0.0", optional = true }
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "nes-sound"
+path = "src/main.rs"
+required-features = ["firmware"]
+test = false
+bench = false
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
