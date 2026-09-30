@@ -141,27 +141,20 @@ impl Apu {
             }
         }
 
-        self.pulse[channel] = PulseChannel {
-            enabled,
-            frequency_hz,
-            volume: volume.clamp(0.0, 1.0),
-            timer_period: timer_period(16.0, frequency_hz),
-            duty_mode,
-            sequence_index: 0,
-            timer_phase_cycles: 0.0,
-        };
+        let pulse = &mut self.pulse[channel];
+        pulse.enabled = enabled;
+        pulse.frequency_hz = frequency_hz;
+        pulse.volume = volume.clamp(0.0, 1.0);
+        pulse.timer_period = timer_period(16.0, frequency_hz);
+        pulse.duty_mode = duty_mode;
     }
 
     /// Configure the triangle channel.
     pub fn set_triangle(&mut self, enabled: bool, frequency_hz: f32, volume: f32) {
-        self.triangle = TriangleChannel {
-            enabled,
-            frequency_hz,
-            volume: volume.clamp(0.0, 1.0),
-            timer_period: timer_period(32.0, frequency_hz),
-            sequence_index: 0,
-            timer_phase_cycles: 0.0,
-        };
+        self.triangle.enabled = enabled;
+        self.triangle.frequency_hz = frequency_hz;
+        self.triangle.volume = volume.clamp(0.0, 1.0);
+        self.triangle.timer_period = timer_period(32.0, frequency_hz);
     }
 
     /// Configure the noise channel.
